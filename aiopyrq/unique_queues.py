@@ -19,12 +19,10 @@ import os
 
 from typing import Union
 
-from aioredis.connection import RedisConnection
-from aioredis.pool import ConnectionsPool
-from aioredis.commands import Redis
+from aioredis.client import Script
+from aioredis import Connection, ConnectionPool, Redis
 
 from aiopyrq import helpers
-from aiopyrq.script import Script
 
 CHUNK_SIZE = 10
 SET_QUEUE_SUFFIX = '-unique'
@@ -52,7 +50,7 @@ class UniqueQueue(object):
     author: Heureka.cz <vyvoj@heureka.cz>
     """
 
-    def __init__(self, queue_name: str, redis: Union[ConnectionsPool, RedisConnection, Redis], **kwargs):
+    def __init__(self, queue_name: str, redis: Union[ConnectionPool, Connection, Redis], **kwargs):
         """
         :param queue_name: Name of the queue
         :param redis: Redis client
@@ -65,8 +63,8 @@ class UniqueQueue(object):
         """
         self.client_id = '{0}[{1}][{2}]'.format(socket.gethostname(), os.getpid(), int(time.time()))
 
-        if isinstance(redis, (ConnectionsPool, RedisConnection)):
-            redis = Redis(redis)
+        if isinstance(redis, (ConnectionPool, Connection)):
+            redis = Redis(connection_pool=redis)
 
         self.redis = redis
         self.queue_name = queue_name
@@ -247,7 +245,7 @@ class UniqueQueue(object):
         await self._wait_for_synced_slaves()
 
     async def _get_sorted_processing_queues(self) -> list:
-        return sorted(await helpers.async_iterate_to_list(self.redis.ihscan(self.timeouts_hash_name)), reverse=True)
+        return sorted(await helpers.async_iterate_to_list(self.redis.hscan_iter(self.timeouts_hash_name)), reverse=True)
 
     @property
     def set_name(self) -> str:

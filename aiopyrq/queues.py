@@ -19,11 +19,10 @@ import os
 
 from typing import Union
 
-from aioredis import ConnectionsPool, RedisConnection
-from aioredis.commands import Redis
+from aioredis import Connection, ConnectionPool, Redis
+from aioredis.client import Script
 
 from aiopyrq import helpers
-from aiopyrq.script import Script
 
 CHUNK_SIZE = 10
 RETRY_SUFFIX = '-retry-count'
@@ -49,7 +48,7 @@ class Queue(object):
     author: Heureka.cz <vyvoj@heureka.cz>
     """
 
-    def __init__(self, name: str, redis: Union[ConnectionsPool, RedisConnection, Redis], **kwargs):
+    def __init__(self, name: str, redis: Union[ConnectionPool, Connection, Redis], **kwargs):
         """
         :param name: Name of the queue
         :param redis: Redis connection
@@ -64,8 +63,8 @@ class Queue(object):
         self.name = name
         self.options = kwargs
 
-        if isinstance(redis, (ConnectionsPool, RedisConnection)):
-            redis = Redis(redis)
+        if isinstance(redis, (ConnectionPool, Connection)):
+            redis = Redis(connection_pool=redis)
 
         self.redis = redis
         self._register_commands()
@@ -245,7 +244,7 @@ class Queue(object):
         await self._wait_for_synced_slaves()
 
     async def _get_sorted_processing_queues(self) -> list:
-        return sorted(await helpers.async_iterate_to_list(self.redis.ihscan(self.timeouts_hash_name)), reverse=True)
+        return sorted(await helpers.async_iterate_to_list(self.redis.hscan_iter(self.timeouts_hash_name)), reverse=True)
 
     @property
     def retry_count_name(self) -> str:
